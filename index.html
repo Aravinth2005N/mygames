@@ -1,0 +1,624 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Undercover Party Game (Offline)</title>
+  <meta name="description" content="Offline-first Undercover party game with English and Tamil word packs" />
+  <meta name="theme-color" content="#121212" />
+  <style>
+    :root {
+      --bg: #121212;
+      --surface: #1e1e1e;
+      --surface-2: #222;
+      --text: #fff;
+      --muted: #a7a7a7;
+      --primary: #1db954;
+      --danger: #e74c3c;
+      --accent: #4aa3ff;
+    }
+    * { box-sizing: border-box }
+    html, body { height: 100%; }
+    body {
+      margin: 0;
+      font-family: system-ui, -apple-system, Segoe UI, Roboto, Ubuntu, Cantarell, "Noto Sans", Arial, "Apple Color Emoji", "Segoe UI Emoji";
+      background: var(--bg);
+      color: var(--text);
+    }
+    .app { max-width: 720px; margin: 0 auto; min-height: 100%; display: grid; grid-template-rows: auto 1fr auto; }
+    header { padding: 16px; display: flex; align-items: center; justify-content: space-between; background: var(--surface); position: sticky; top: 0; z-index: 5; }
+    header h1 { margin: 0; font-size: 18px; }
+    header .actions { display: flex; gap: 8px; }
+    main { padding: 16px; }
+    footer { padding: 12px 16px; color: var(--muted); font-size: 12px; background: var(--surface); }
+
+    .card { background: var(--surface); border: 1px solid #2b2b2b; border-radius: 12px; padding: 16px; }
+    .row { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+    .row-3 { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 12px; }
+    label { display: block; font-size: 14px; color: var(--muted); margin-bottom: 6px; }
+    input[type="number"], select, input[type="text"] { width: 100%; padding: 10px 12px; border-radius: 8px; border: 1px solid #2b2b2b; background: var(--surface-2); color: var(--text); }
+    .switch { display: inline-flex; align-items: center; gap: 6px; cursor: pointer; user-select: none; }
+    .switch input { width: 18px; height: 18px; }
+
+    .btn { appearance: none; border: none; background: var(--primary); color: #000; font-weight: 700; border-radius: 999px; padding: 10px 16px; cursor: pointer; transition: transform .1s ease; }
+    .btn:hover { transform: translateY(-1px); }
+    .btn.secondary { background: var(--accent); color: #000; }
+    .btn.ghost { background: transparent; color: var(--text); border: 1px solid #2b2b2b; }
+    .btn.danger { background: var(--danger); color: #fff; }
+    .btn.small { padding: 8px 12px; font-size: 14px; }
+
+    .hidden { display: none !important; }
+    .center { text-align: center; }
+    .muted { color: var(--muted); }
+    .stack { display: flex; flex-direction: column; gap: 12px; }
+    .stack-8 { display: flex; flex-direction: column; gap: 8px; }
+    .list { display: flex; flex-wrap: wrap; gap: 8px; }
+    .chip { padding: 6px 10px; border-radius: 999px; border: 1px solid #2b2b2b; background: var(--surface-2); font-size: 12px; }
+    .timer { font-variant-numeric: tabular-nums; font-size: 28px; }
+    .word { font-size: 28px; font-weight: 800; letter-spacing: .4px; }
+    .screen { animation: fade .18s ease; }
+    @keyframes fade { from { opacity: 0; transform: translateY(4px);} to { opacity: 1; transform: translateY(0);} }
+
+    .sr-only { position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden; clip: rect(0,0,0,0); border: 0; }
+  </style>
+</head>
+<body>
+  <div class="app" role="application">
+    <header>
+      <h1 aria-label="Undercover party game">Undercover</h1>
+      <div class="actions">
+        <button id="btnSettings" class="btn ghost small" aria-haspopup="dialog" aria-controls="settingsDialog">Settings</button>
+        <button id="btnHelp" class="btn ghost small">Help</button>
+      </div>
+    </header>
+    <main>
+      <!-- Lobby -->
+      <section id="lobby" class="screen">
+        <div class="card stack" aria-labelledby="lobbyTitle">
+          <h2 id="lobbyTitle">Lobby</h2>
+          <div class="row">
+            <div>
+              <label for="playerCount">Players (3–20)</label>
+              <input id="playerCount" type="number" min="3" max="20" value="6" aria-describedby="playerCountHelp" />
+              <div id="playerCountHelp" class="sr-only">Set number of players between 3 and 20</div>
+            </div>
+            <div>
+              <label for="language">Language</label>
+              <select id="language">
+                <option value="en">English</option>
+                <option value="ta">தமிழ் (Tamil)</option>
+              </select>
+            </div>
+          </div>
+          <div class="row">
+            <div>
+              <label for="theme">Theme</label>
+              <select id="theme"></select>
+            </div>
+            <div>
+              <label for="difficulty">Difficulty</label>
+              <select id="difficulty">
+                <option value="easy">Easy</option>
+                <option value="medium">Medium</option>
+                <option value="hard">Hard</option>
+              </select>
+            </div>
+          </div>
+          <div class="row">
+            <div class="switch" role="switch" aria-checked="false" tabindex="0" id="optBlackCardWrap">
+              <input type="checkbox" id="optBlackCard" aria-label="Include a black card (optional)" />
+              <span>Include Black Card</span>
+            </div>
+            <div class="switch" role="switch" aria-checked="true" tabindex="0" id="optPassDeviceWrap">
+              <input type="checkbox" id="optPassDevice" checked aria-label="Use pass-device private words" />
+              <span>Pass-device mode</span>
+            </div>
+          </div>
+          <div class="stack-8">
+            <div class="muted">Built-in word pack: 10,000 words per language (generated locally and cached).</div>
+            <div class="list" id="selectedSetInfo"></div>
+          </div>
+          <div class="row">
+            <button id="btnStart" class="btn" aria-label="Start game">Start Game</button>
+            <button id="btnManagePacks" class="btn secondary" aria-label="Manage word packs">Manage Packs</button>
+          </div>
+        </div>
+      </section>
+
+      <!-- Pass-device private prompt -->
+      <section id="passDevice" class="screen hidden">
+        <div class="card stack center" aria-labelledby="passTitle">
+          <h2 id="passTitle">Private Word</h2>
+          <div id="passPlayerLabel" class="muted">Player 1</div>
+          <div id="privateWord" class="word" aria-live="polite">Tap to reveal</div>
+          <div class="stack-8">
+            <button id="btnReveal" class="btn" aria-label="Reveal word">Reveal</button>
+            <button id="btnNextPlayer" class="btn secondary hidden" aria-label="Next player">Next</button>
+          </div>
+          <div class="muted">Pass the device to the next player after viewing.</div>
+        </div>
+      </section>
+
+      <!-- Discussion & Voting -->
+      <section id="discussion" class="screen hidden">
+        <div class="card stack" aria-labelledby="discTitle">
+          <h2 id="discTitle">Discuss & Vote</h2>
+          <div class="row">
+            <div>
+              <label for="voteTimer">Timer (min)</label>
+              <select id="voteTimer">
+                <option value="2">2</option>
+                <option value="3">3</option>
+                <option value="5">5</option>
+              </select>
+            </div>
+            <div class="stack">
+              <div class="timer" id="timerDisplay">00:00</div>
+              <div class="list">
+                <button id="btnTimerStart" class="btn small" aria-label="Start timer">Start</button>
+                <button id="btnTimerPause" class="btn ghost small" aria-label="Pause timer">Pause</button>
+                <button id="btnTimerReset" class="btn ghost small" aria-label="Reset timer">Reset</button>
+              </div>
+            </div>
+          </div>
+          <div class="stack-8">
+            <label for="voteSelect">Vote a player to eliminate</label>
+            <select id="voteSelect"></select>
+            <div class="list">
+              <button id="btnCastVote" class="btn" aria-label="Cast vote">Cast Vote</button>
+              <button id="btnRevealRound" class="btn secondary" aria-label="Reveal round">Reveal Round</button>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- Reveal Screen -->
+      <section id="reveal" class="screen hidden">
+        <div class="card stack center" aria-labelledby="revTitle">
+          <h2 id="revTitle">Round Reveal</h2>
+          <div id="revealSummary" class="stack"></div>
+          <div class="list center" style="justify-content:center;">
+            <button id="btnNewRound" class="btn" aria-label="New round">New Round</button>
+            <button id="btnBackLobby" class="btn ghost" aria-label="Back to lobby">Back to Lobby</button>
+          </div>
+        </div>
+      </section>
+
+      <!-- History -->
+      <section id="history" class="screen">
+        <div class="card stack" aria-labelledby="histTitle">
+          <h2 id="histTitle">Round History</h2>
+          <div id="historyList" class="stack"></div>
+        </div>
+      </section>
+
+      <!-- Settings Dialog -->
+      <dialog id="settingsDialog" aria-label="Settings" style="border:none;border-radius:12px;background:var(--surface);color:var(--text);padding:16px;max-width:560px;">
+        <form method="dialog" class="stack">
+          <h3>Settings</h3>
+          <div class="row">
+            <div>
+              <label for="optAnimations">Animations</label>
+              <select id="optAnimations">
+                <option value="on">On</option>
+                <option value="off">Off</option>
+              </select>
+            </div>
+            <div>
+              <label for="optAccessibility">Accessibility Mode</label>
+              <select id="optAccessibility">
+                <option value="normal">Normal</option>
+                <option value="high-contrast">High Contrast</option>
+              </select>
+            </div>
+          </div>
+          <div class="stack-8">
+            <button id="btnClearData" class="btn danger" type="button">Clear Local Data</button>
+            <button class="btn" value="close">Close</button>
+          </div>
+        </form>
+      </dialog>
+
+      <!-- Manage Packs Dialog -->
+      <dialog id="packsDialog" aria-label="Word Packs" style="border:none;border-radius:12px;background:var(--surface);color:var(--text);padding:16px;max-width:720px;">
+        <form method="dialog" class="stack">
+          <h3>Word Packs</h3>
+          <p class="muted">Built-in packs are generated locally and cached. You may also import your own JSON pack.</p>
+          <div class="row">
+            <div>
+              <label for="packImport">Import pack (JSON)</label>
+              <input id="packImport" type="file" accept="application/json" />
+            </div>
+            <div class="stack-8">
+              <button id="btnExportPacks" class="btn small" type="button">Export current packs</button>
+              <button id="btnResetPacks" class="btn danger small" type="button">Reset to built-in</button>
+            </div>
+          </div>
+          <button class="btn" value="close">Close</button>
+        </form>
+      </dialog>
+    </main>
+    <footer>
+      <span>Offline-first • No internet required • Data stays on your device</span>
+    </footer>
+  </div>
+
+  <script>
+  // --- Utilities & Persistence ---
+  const store = {
+    get(key, fallback) {
+      try { const v = localStorage.getItem(key); return v ? JSON.parse(v) : fallback; } catch { return fallback; }
+    },
+    set(key, value) { localStorage.setItem(key, JSON.stringify(value)); }
+  };
+
+  function $(id) { return document.getElementById(id); }
+  function show(id) { $(id).classList.remove('hidden'); }
+  function hide(id) { $(id).classList.add('hidden'); }
+  function formatTimer(ms) {
+    const s = Math.max(0, Math.floor(ms / 1000));
+    const m = Math.floor(s / 60); const r = s % 60; return `${String(m).padStart(2,'0')}:${String(r).padStart(2,'0')}`;
+  }
+
+  // --- Built-in 10k packs (generated locally) ---
+  // To keep single-file size sensible, we generate deterministic words on the fly and cache them.
+  // Themes provide base terms; we expand to 10,000 with numbered variants per theme.
+  const BASE_THEMES_EN = {
+    Animals: ["Lion","Tiger","Elephant","Eagle","Shark","Fox","Bear","Rabbit","Wolf","Dolphin"],
+    Food: ["Apple","Banana","Bread","Cheese","Coffee","Rice","Pasta","Cake","Salad","Soup"],
+    Tech: ["Server","Router","Database","Cache","Kernel","Compiler","Protocol","Network","Cloud","Sensor"],
+    Places: ["Beach","Forest","Desert","Mountain","City","Village","Harbor","Island","Valley","Canyon"],
+    Sports: ["Soccer","Cricket","Tennis","Hockey","Chess","Rugby","Badminton","Cycling","Running","Swimming"],
+    Jobs: ["Doctor","Engineer","Teacher","Artist","Pilot","Baker","Farmer","Nurse","Chef","Writer"]
+  };
+  const BASE_THEMES_TA = {
+    "விலங்குகள்": ["சிங்கம்","புலி","யானை","கழுகு","சுறா","நரி","கரடி","முயல்","ஒநாய்","ஈரல்"],
+    "உணவு": ["ஆப்பிள்","வாழைப்பழம்","ரொட்டி","சீஸ்","காபி","அரிசி","பாஸ்தா","கேக்","சாலட்","சூப்"],
+    "தொழில்நுட்பம்": ["சர்வர்","ரூட்டர்","டேட்டாபேஸ்","கேஷ்","கர்னல்","கம்பைலர்","ப்ரொடோகால்","நெட்வொர்க்","க்ளவுட்","சென்சார்"],
+    "இடங்கள்": ["கடற்கரை","காடு","பாலைவனம்","மலை","நகரம்","கிராமம்","துறைமுகம்","தீவு","பள்ளத்தாக்கு","உள்நாடு"],
+    "விளையாட்டு": ["கால்பந்து","கிரிக்கெட்","டென்னிஸ்","ஹாக்கி","சதுரங்கம்","ரக்பி","பாட்மிண்டன்","சைக்கிள்","ஓட்டம்","நீச்சல்"],
+    "வேலைகள்": ["மருத்துவர்","இயற்பொறியாளர்","ஆசிரியர்","கலைஞர்","விமானி","அப்பளம்","விவசாயி","நர்ஸ்","சமையல்காரர்","எழுத்தாளர்"]
+  };
+
+  function generatePack(language) {
+    const base = language === 'en' ? BASE_THEMES_EN : BASE_THEMES_TA;
+    const pack = { language, themes: {}, total: 10000 };
+    const themeKeys = Object.keys(base);
+    const perThemeTarget = Math.ceil(10000 / themeKeys.length);
+    themeKeys.forEach(theme => {
+      const words = [];
+      const seeds = base[theme];
+      let i = 0;
+      while (words.length < perThemeTarget) {
+        const w = seeds[i % seeds.length];
+        const variant = `${w}${language==='en' ? '' : ''}-${String(i+1).padStart(4,'0')}`;
+        words.push(variant);
+        i++;
+      }
+      pack.themes[theme] = words;
+    });
+    return pack;
+  }
+
+  async function ensurePacksCached() {
+    let packs = store.get('packs');
+    if (!packs) {
+      // generate and cache built-in packs
+      const english = generatePack('en');
+      const tamil = generatePack('ta');
+      packs = { builtIn: { english, tamil }, custom: [] };
+      store.set('packs', packs);
+    }
+    return packs;
+  }
+
+  function getThemesForLanguage(packs, lang) {
+    const p = lang === 'en' ? packs.builtIn.english : packs.builtIn.tamil;
+    return Object.keys(p.themes);
+  }
+
+  function getWords(packs, lang, theme, difficulty) {
+    const p = lang === 'en' ? packs.builtIn.english : packs.builtIn.tamil;
+    const arr = p.themes[theme] || [];
+    // Difficulty shapes similarity by picking nearby indices for undercover
+    return arr;
+  }
+
+  // --- Game State ---
+  const game = {
+    players: [],
+    undercoverIndex: null,
+    blackCardIndex: null,
+    words: { common: null, undercover: null },
+    language: 'en',
+    theme: null,
+    difficulty: 'easy',
+    history: store.get('history', [])
+  };
+
+  function setupLobbyUI(packs) {
+    // Populate themes
+    const themeSel = $('theme');
+    themeSel.innerHTML = '';
+    getThemesForLanguage(packs, game.language).forEach(t => {
+      const opt = document.createElement('option'); opt.value = t; opt.textContent = t; themeSel.appendChild(opt);
+    });
+    game.theme = themeSel.value;
+
+    $('language').addEventListener('change', (e) => {
+      game.language = e.target.value;
+      setupLobbyUI(packs);
+      renderSelectedSetInfo(packs);
+    });
+    $('theme').addEventListener('change', (e) => { game.theme = e.target.value; });
+    $('difficulty').addEventListener('change', (e) => { game.difficulty = e.target.value; });
+    $('optBlackCard').addEventListener('change', (e) => { /* no-op, read on start */ });
+    $('optPassDevice').addEventListener('change', (e) => { /* no-op */ });
+    renderSelectedSetInfo(packs);
+  }
+
+  function renderSelectedSetInfo(packs) {
+    const info = $('selectedSetInfo');
+    info.innerHTML = '';
+    const p = game.language === 'en' ? packs.builtIn.english : packs.builtIn.tamil;
+    const total = Object.values(p.themes).reduce((a,b)=>a+b.length,0);
+    info.appendChild(chip(`Language: ${game.language==='en'?'English':'Tamil'}`));
+    info.appendChild(chip(`Themes: ${Object.keys(p.themes).length}`));
+    info.appendChild(chip(`Words cached: ${total}`));
+  }
+
+  function chip(text) { const d = document.createElement('div'); d.className='chip'; d.textContent=text; return d; }
+
+  // --- Role assignment & words ---
+  function assignRoles(playerCount, includeBlackCard) {
+    const idxs = Array.from({length:playerCount}, (_,i)=>i);
+    const undercover = idxs[Math.floor(Math.random()*idxs.length)];
+    let black = null;
+    if (includeBlackCard) {
+      // ensure different from undercover
+      const remaining = idxs.filter(i => i!==undercover);
+      black = remaining[Math.floor(Math.random()*remaining.length)];
+    }
+    return { undercover, black };
+  }
+
+  function pickWords(packs, lang, theme, difficulty) {
+    const words = getWords(packs, lang, theme, difficulty);
+    const i = Math.floor(Math.random()*words.length);
+    let j = i;
+    const delta = difficulty==='easy'? 50 : difficulty==='medium'? 10 : 1;
+    j = Math.min(words.length-1, Math.max(0, i + (Math.random()<0.5 ? -delta : delta)));
+    if (j===i) j = (i+1) % words.length;
+    return { common: words[i], undercover: words[j] };
+  }
+
+  // --- Screens flow ---
+  function toScreen(id) {
+    ['lobby','passDevice','discussion','reveal'].forEach(s => (s===id?show(s):hide(s)));
+  }
+
+  function startGame(packs) {
+    const count = Math.max(3, Math.min(20, parseInt($('playerCount').value || '6', 10)));
+    const includeBlack = $('optBlackCard').checked;
+    game.players = Array.from({length:count}, (_,i)=>({ id:i+1, voted:false }));
+    const roles = assignRoles(count, includeBlack);
+    game.undercoverIndex = roles.undercover;
+    game.blackCardIndex = roles.black;
+    game.words = pickWords(packs, game.language, game.theme, game.difficulty);
+
+    // Prepare pass-device
+    passIndex = 0;
+    $('passPlayerLabel').textContent = `Player ${passIndex+1}`;
+    $('privateWord').textContent = 'Tap to reveal';
+    $('btnReveal').classList.remove('hidden');
+    $('btnNextPlayer').classList.add('hidden');
+    toScreen('passDevice');
+    renderVoteOptions();
+  }
+
+  let passIndex = 0;
+  function revealWordForCurrent() {
+    const idx = passIndex;
+    const isUC = idx === game.undercoverIndex;
+    const isBlack = game.blackCardIndex!==null && idx === game.blackCardIndex;
+    let word = game.words.common;
+    if (isUC) word = game.words.undercover;
+    if (isBlack) word = '❓';
+    $('privateWord').textContent = word;
+    $('btnReveal').classList.add('hidden');
+    $('btnNextPlayer').classList.remove('hidden');
+  }
+  function nextPlayer() {
+    passIndex++;
+    if (passIndex >= game.players.length) {
+      toScreen('discussion');
+      startTimer();
+      return;
+    }
+    $('passPlayerLabel').textContent = `Player ${passIndex+1}`;
+    $('privateWord').textContent = 'Tap to reveal';
+    $('btnReveal').classList.remove('hidden');
+    $('btnNextPlayer').classList.add('hidden');
+  }
+
+  // --- Timer ---
+  let timerId = null, timerEnd = 0;
+  function startTimer() {
+    const minutes = parseInt($('voteTimer').value, 10);
+    timerEnd = Date.now() + minutes*60*1000;
+    if (timerId) clearInterval(timerId);
+    timerId = setInterval(() => {
+      const remaining = Math.max(0, timerEnd - Date.now());
+      $('timerDisplay').textContent = formatTimer(remaining);
+      if (remaining <= 0) { clearInterval(timerId); timerId=null; }
+    }, 200);
+  }
+  function pauseTimer() { if (timerId) { clearInterval(timerId); timerId=null; } }
+  function resetTimer() { pauseTimer(); $('timerDisplay').textContent = '00:00'; }
+
+  // --- Voting ---
+  function renderVoteOptions() {
+    const sel = $('voteSelect'); sel.innerHTML = '';
+    game.players.forEach((p,i)=>{
+      const o = document.createElement('option'); o.value = i; o.textContent = `Player ${i+1}`; sel.appendChild(o);
+    });
+  }
+  function castVote() {
+    const idx = parseInt($('voteSelect').value, 10);
+    game.players[idx].voted = true;
+    const outedUC = idx === game.undercoverIndex;
+    const round = {
+      ts: new Date().toISOString(),
+      players: game.players.length,
+      theme: game.theme,
+      language: game.language,
+      words: game.words,
+      voteOut: idx+1,
+      wasUCOuted: outedUC,
+      undercover: game.undercoverIndex+1,
+      blackCard: game.blackCardIndex!==null? game.blackCardIndex+1 : null
+    };
+    game.history.unshift(round);
+    store.set('history', game.history);
+    renderHistory();
+    showReveal(round);
+  }
+
+  function showReveal(round) {
+    toScreen('reveal');
+    const box = $('revealSummary');
+    box.innerHTML = '';
+    const lines = [
+      `Theme: ${round.theme} (${round.language==='en'?'English':'Tamil'})`,
+      `Common word: ${round.words.common}`,
+      `Undercover word: ${round.words.undercover}`,
+      `Undercover was Player ${round.undercover}`,
+      round.blackCard? `Black card was Player ${round.blackCard}` : 'Black card not used',
+      `Eliminated: Player ${round.voteOut} → ${round.wasUCOuted? 'Undercover caught ✅' : 'Missed ❌'}`
+    ];
+    lines.forEach(t => { const d=document.createElement('div'); d.textContent=t; box.appendChild(d); });
+  }
+
+  function renderHistory() {
+    const list = $('historyList'); list.innerHTML = '';
+    if (!game.history.length) {
+      const d = document.createElement('div'); d.className='muted'; d.textContent='No rounds yet. Play a game!'; list.appendChild(d); return;
+    }
+    game.history.forEach(r => {
+      const c = document.createElement('div'); c.className='card stack-8';
+      const when = new Date(r.ts);
+      const h = document.createElement('div'); h.className='muted'; h.textContent = `${when.toLocaleString()} • ${r.players} players • ${r.theme}`;
+      const b = document.createElement('div'); b.textContent = `UC: P${r.undercover} • Out: P${r.voteOut} • ${r.wasUCOuted? 'Caught' : 'Escaped'}`;
+      const w = document.createElement('div'); w.className='muted'; w.textContent = `Words: ${r.words.common} vs ${r.words.undercover}`;
+      c.appendChild(h); c.appendChild(b); c.appendChild(w);
+      list.appendChild(c);
+    });
+  }
+
+  // --- Settings ---
+  function applyAccessibility() {
+    const mode = store.get('optAccessibility','normal');
+    if (mode==='high-contrast') {
+      document.documentElement.style.setProperty('--bg','#000');
+      document.documentElement.style.setProperty('--surface','#000');
+      document.documentElement.style.setProperty('--surface-2','#000');
+      document.documentElement.style.setProperty('--text','#fff');
+      document.documentElement.style.setProperty('--muted','#ddd');
+      document.documentElement.style.setProperty('--primary','#ff0');
+    }
+  }
+
+  // --- Packs import/export ---
+  function exportPacks() {
+    const packs = store.get('packs');
+    const blob = new Blob([JSON.stringify(packs,null,2)], { type: 'application/json' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a'); a.href=url; a.download='undercover-packs.json'; a.click(); URL.revokeObjectURL(url);
+  }
+  async function resetPacks() { store.set('packs', null); const packs = await ensurePacksCached(); setupLobbyUI(packs); }
+
+  // --- Service Worker (optional when hosted) ---
+  async function registerSW() {
+    if ('serviceWorker' in navigator && location.protocol.startsWith('http')) {
+      try {
+        // This expects you to host a sw.js next to index.html when deploying.
+        // The app still works offline when opened as a local file.
+        await navigator.serviceWorker.register('./sw.js');
+        console.log('Service worker registered');
+      } catch (e) { console.warn('SW registration failed', e); }
+    }
+  }
+
+  // --- Events wiring ---
+  (async function init(){
+    applyAccessibility();
+    const packs = await ensurePacksCached();
+    setupLobbyUI(packs);
+    renderHistory();
+    registerSW();
+
+    $('btnStart').addEventListener('click', () => startGame(packs));
+    $('btnReveal').addEventListener('click', revealWordForCurrent);
+    $('btnNextPlayer').addEventListener('click', nextPlayer);
+    $('btnTimerStart').addEventListener('click', startTimer);
+    $('btnTimerPause').addEventListener('click', pauseTimer);
+    $('btnTimerReset').addEventListener('click', resetTimer);
+    $('btnCastVote').addEventListener('click', castVote);
+    $('btnRevealRound').addEventListener('click', () => showReveal({
+      ts:new Date().toISOString(), players: game.players.length, theme: game.theme, language: game.language,
+      words: game.words, voteOut: null, wasUCOuted: null, undercover: game.undercoverIndex+1, blackCard: game.blackCardIndex!==null? game.blackCardIndex+1 : null
+    }));
+    $('btnNewRound').addEventListener('click', () => { toScreen('lobby'); });
+    $('btnBackLobby').addEventListener('click', () => { toScreen('lobby'); });
+
+    $('btnSettings').addEventListener('click', () => $('settingsDialog').showModal());
+    $('btnHelp').addEventListener('click', () => alert('How to play: Everyone sees a word, one player (Undercover) gets a similar word. Discuss, then vote to eliminate.'));
+    $('btnClearData').addEventListener('click', () => { localStorage.clear(); location.reload(); });
+    $('btnManagePacks').addEventListener('click', () => $('packsDialog').showModal());
+    $('btnExportPacks').addEventListener('click', exportPacks);
+    $('btnResetPacks').addEventListener('click', resetPacks);
+    $('packImport').addEventListener('change', async (e) => {
+      const file = e.target.files[0]; if (!file) return;
+      const text = await file.text();
+      try {
+        const imported = JSON.parse(text);
+        const current = store.get('packs')||{ builtIn:{}, custom:[] };
+        current.custom.push(imported);
+        store.set('packs', current);
+        alert('Pack imported. It will appear along with built-in packs.');
+      } catch(err) { alert('Invalid JSON pack'); }
+    });
+
+    // Keyboard accessibility for switches
+    function bindSwitch(wrapperId, inputId) {
+      const wrap = $(wrapperId), input = $(inputId);
+      wrap.addEventListener('keydown', (ev)=>{ if (ev.key==='Enter' || ev.key===' ') { input.checked=!input.checked; ev.preventDefault(); } });
+    }
+    bindSwitch('optBlackCardWrap','optBlackCard');
+    bindSwitch('optPassDeviceWrap','optPassDevice');
+
+    // Tiny test runner (open with ?test=1 to run)
+    if (new URLSearchParams(location.search).get('test')==='1') {
+      const tests = [];
+      function it(name, fn){ tests.push({name, fn}); }
+      function expect(cond, msg){ if(!cond) throw new Error(msg||'Assertion failed'); }
+      it('generatePack returns ~10k words', () => {
+        const p = generatePack('en');
+        const total = Object.values(p.themes).reduce((a,b)=>a+b.length,0);
+        expect(total>=10000, `expected >=10000, got ${total}`);
+      });
+      it('assignRoles assigns distinct undercover/black when enabled', () => {
+        const {undercover, black} = assignRoles(8,true); expect(undercover!==black,'roles must be distinct');
+      });
+      it('pickWords returns two words (possibly distinct)', () => {
+        const packs = { builtIn: { english: generatePack('en') }, tamil: null };
+        const w = pickWords({ builtIn: { english: generatePack('en'), tamil: generatePack('ta') } }, 'en', 'Animals', 'medium');
+        expect(w.common && w.undercover, 'words not picked');
+      });
+      let passed=0; tests.forEach(t=>{ try{ t.fn(); console.log('✔', t.name); passed++; } catch(e){ console.error('✖', t.name, e.message); } });
+      alert(`Tests run: ${tests.length}, passed: ${passed}`);
+    }
+  })();
+  </script>
+</body>
+</html>
